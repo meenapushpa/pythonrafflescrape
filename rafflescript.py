@@ -71,10 +71,10 @@ class Raffle(object):
     def raffle_entry(self,proxy,auth=None):
         log("Entering raffle")
         raffle_token_request = 'https://www.nakedcph.com/en/898/nike-x-ambush-dunk-hi-cu7544-600-fcfs-raffle'
-        tokens, user_agent = cfscrape.get_tokens("https://www.nakedcph.com/en/898/nike-x-ambush-dunk-hi-cu7544-600-fcfs-raffle", proxies={"http": proxy, "https": proxy}, auth=auth, verify=False)
-        """raffle_token = self.r.get(raffle_token_request, headers = self.headers, proxies={"http": proxy, "https": proxy}, verify=False)
-        raffle_token = str(raffle_token.text)"""
-        print(tokens)
+        """tokens, user_agent = cfscrape.get_tokens("https://www.nakedcph.com/en/898/nike-x-ambush-dunk-hi-cu7544-600-fcfs-raffle", proxies={"http": proxy, "https": proxy}, auth=auth, verify=False)"""
+        raffle_token = self.r.get(raffle_token_request, headers = self.headers, proxies={"http": proxy, "https": proxy}, auth=auth, verify=False, timeout=10)
+        raffle_token = str(raffle_token.status_code)
+        print(raffle_token)
         """
         payload = {
             'form[language]': 'en',
@@ -101,7 +101,10 @@ if __name__ == '__main__':
         proxyparse, httpauth = ra.proxy_parse(proxy)
         freeproxy = ra.freeproxylist()
         for freelist in freeproxy:
-            log('Using ' + freelist + ' for the registration and raffle entries')
-            ra.raffle_entry(freelist)
-            ra.cookies.clear()
-            time.sleep(1)
+            try:
+                log('Using ' + freelist + ' for the registration and raffle entries')
+                ra.raffle_entry(freelist)
+                ra.r.cookies.clear()
+                time.sleep(1)
+            except:
+                log("No luck, Trying next...")
