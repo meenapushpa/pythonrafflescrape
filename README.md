@@ -5,4 +5,4 @@ RaffleScrape repository is used to track the website request and create a script
 By using requests module, automate the raffle via python script.
 
 
-<Under Construction>
+-----Under Construction----
