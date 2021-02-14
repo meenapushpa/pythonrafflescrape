@@ -5,7 +5,7 @@ cffi==1.14.4
 cfscrape==2.1.1
 chardet==4.0.0
 cloudscraper==1.2.56
-cryptography==3.3.1
+cryptography>=3.3.2
 DateTime==4.3
 idna==2.10
 lxml==4.6.2
