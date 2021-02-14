@@ -19,7 +19,6 @@ Execute the command   `python rafflescript.py` and will ask for couple of inputs
   ```
   cloudscraper.exceptions.CloudflareChallengeError:
   Detected a Cloudflare version 2 challenge, This feature is not available in the opensource (free) version.
-
   ```
   This doesn't mean that will have to go for newer version as this is compromised for the current requirement using our script. It just needs multiple runs to come output
 
