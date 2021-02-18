@@ -30,7 +30,4 @@ Execute the command   `python rafflescript.py` and will ask for couple of inputs
   6. Solving Captcha
   7. Completing the Transaction.
 
-
-## Inflight works
-
-Step 6 and 7 is yet to be completed.
+As of now hardcoded 5 sample accounts to process through script, if require, can modify as per the requirement.
