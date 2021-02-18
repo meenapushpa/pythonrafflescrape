@@ -13,11 +13,16 @@ import sys
 import os
 from twocaptcha import TwoCaptcha
 import codecs
+import bs4
+from bs4 import BeautifulSoup
 
 
-def log(event):
+def log(event,val=None):
     d = datetime.datetime.now().strftime("%x %H:%M:%S")
-    print("[Raffle Logs] :: " + str(d) + " :: " + event)
+    if val:
+        print("[Raffle Logs] :: " + str(d) + " :: " + event +  " :: " + val)
+    else:
+        print("[Raffle Logs] :: " + str(d) + " :: " + event)
 
 class Raffle(object):
     file_proxies = "/root/proxies.txt"
@@ -92,18 +97,34 @@ class Raffle(object):
     def get_sitekey(self,url,proxy,auth=None):
         page = self.scraper.get(url, proxies={"http": proxy, "https": proxy})
         soup = bs.BeautifulSoup(page.text, 'lxml')
-        log('Scraping token')
-        formlist =  soup.find('input' ,attrs={"name":"token"})
-        sitetoken = formlist['value']
         log('Scraping SiteKey token')
         signuplist = soup.find('button' ,attrs={"class":"g-recaptcha"})
         sitekey=signuplist['data-sitekey']
-        return sitekey, sitetoken
+        return sitekey
+    # Returns all form tags found on a web page's `url`
+    def get_all_forms(self,url,proxy):
+        res = self.scraper.get(url, proxies={"http": proxy, "https": proxy}).text
+        soup = bs4.BeautifulSoup(res,features="html.parser")
+        return soup.find_all("form")
+    # Returns the HTML details of a form,including action, method and list of form controls (inputs, etc)
+    def get_form_details(self,form):
+        details = {}
+        action = form.attrs.get("action").lower()
+        method = form.attrs.get("method", "get").lower()
+        inputs = []
+        for input_tag in form.find_all("input"):
+            input_type = input_tag.attrs.get("type", "text")
+            input_name = input_tag.attrs.get("name")
+            input_value =input_tag.attrs.get("value", "")
+            inputs.append({"type": input_type, "name": input_name, "value": input_value})
+        details["action"] = action
+        details["method"] = method
+        details["inputs"] = inputs
+        return details
     # Initial template of two captcha but not completed fully yet **** IN PROGRESS****
     def twocaptcha(self,sitekey,url):
         sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-        api_key = os.getenv('APIKEY_2CAPTCHA', 'YOUR_API_KEY')
-        log(api_key)
+        api_key = os.getenv('APIKEY_2CAPTCHA', '791a83d1333d48429227d52e1a153ea3')
         solver = TwoCaptcha(api_key)
         try:
             result = solver.recaptcha(
@@ -112,45 +133,51 @@ class Raffle(object):
         except Exception as e:
             sys.exit(e)
         else:
-            return str(result)
+            return str(result['code'])
     # function is to process raffle entries by using all the outputs from previous functions
-    def raffle_entry(self,url,suburl,proxy,auth=None):
+    def raffle_entry(self,url,suburl,proxy,accounts,auth=None):
         try:
-            log('Entering raffle')
-            tk, siky = self.get_sitekey(url,proxy)
-            #gresp=self.twocaptcha(siky,url) #This can be enabled only after we retreived the g_captcha_reponse.
-            payload = { # hardcoded for testing and wil be variablised once we fully done
-                'action':'{}'.format(suburl),
-                'id':'rule-optin-form',
-                'tags[]': '75612',
-                'token': '{}'.format(tk),
-                'rule_email': 'petejames@gmail.com',
-                'fields[Raffle.Instagram Handle]': 'pete',
-                'fields[Raffle.Phone Number]': '+33612334455',
-                'fields[Raffle.First Name]': 'pete',
-                'fields[Raffle.Last Name]': 'james',
-                'fields[Raffle.Shipping Address]': '76 rue Porte dOrange',
-                'fields[Raffle.Postal Code]': '97300',
-                'fields[Raffle.City]': 'Cayenne',
-                'fields[Raffle.Country]': 'FR',
-                'fields[Raffle.Signup Newsletter]': 'on',
-                'fields[SignupSource.ip]': '192.0.0.1',
-                'fields[SignupSource.useragent]': 'Mozilla',
-                'language': 'sv',
-                'g-recaptcha-response': '' #This can be set only after we retreived the g_captcha_reponse.
-            }
-            log("Sending payload to the requested URL...")
-            submit = self.scraper.post(url,headers=self.subscriber_headers,data=json.dumps(payload),proxies={"http": proxy, "https": proxy},verify="/root/cacerts")
-            print(submit.status_code)
-            with codecs.open("output.txt", 'w',encoding='utf-8') as outfile: # writing a new file with the ouput for future reference,
-                outfile.write(submit.text)
+            log('Entering raffle URL')
+            i=0
+            tk= self.get_sitekey(url,proxy)
+            first_form = self.get_all_forms(url,proxy)[0]
+            form_details = self.get_form_details(first_form)
+            data = {}
+            for individual_list in accounts:
+                log("Constructing payload for the", individual_list[5])
+                for input_tag,value_tag in zip(form_details["inputs"],individual_list):
+                    if input_tag["type"] == "hidden":
+                        data[input_tag["name"]] = input_tag["value"]
+                    elif input_tag["type"] != "submit":
+                        data[input_tag["name"]] = value_tag
+                log("Resolving Captcha")
+                gresp=self.twocaptcha(tk,url) # Resolving 2Captch here !
+                data['g-recaptcha-response']=gresp
+                log("Sending payload to the requested URL")
+                submit = self.scraper.post(suburl,data=data,proxies={"http": proxy, "https": proxy})
+                if submit.status_code == 200:
+                    log("Your registration was sucessfull !!")
+                    i += 1
+                else:
+                    log("Failed to register !!")
+                with codecs.open("output.txt", 'w',encoding='utf-8') as outfile: # writing a text file with the ouput for future reference,
+                    outfile.write(submit.text)
+                soup = BeautifulSoup(submit.content, "html.parser")
+                open("submit.html", "w").write(str(soup)) # writing a html file with the ouput for future reference,
+            return i
         except requests.exceptions.RequestException as err:
-              print(err)
+            print(err)
 
 if __name__ == '__main__':
     ra = Raffle()
     url = 'https://www.nakedcph.com:443/xx/904/nike-dunk-hi-retro-prm-fcfs-raffle' # hardcoded for testing and wil be variablised once we fully done
     suburl = 'https://app.rule.io/subscriber-form/subscriber' # hardcoded for testing and wil be variablised once we fully done
+    accounts = [
+    [None,None,'Jack.Smith@gmail.com', 'JackS12', '+44 78 3063 3285', 'Jack', 'Smith', '58  Warren St', 'NE61 2TD', 'WEST EDINGTON', 'true', None,None,'true',None],
+    [None,None,'Geroge.Adampson@gmail.com', 'Geroge1', '+44 78 4063 5285', 'George', 'Adampson', '59  Warren St', 'NE61 2TE', 'WEST EDINGTON', 'true', None,None,'true',None],
+    [None,None,'Emma.Smith@gmail.com', 'Emma', '+44 78 3123 3285', 'Emma', 'Smith', '60  Warren St', 'NE61 2TF', 'WEST EDINGTON', 'true', None,None,'true',None],
+    [None,None,'Jack.Hughes@gmail.com', 'Hughes', '+44 78 3063 3234', 'Jack', 'Hughes', '85  Warren St', 'NE71 2TD', 'WEST EDINGTON', 'true', None,None,'true',None]
+    ]
     option=input("Enter the proxy type [Manual/Online]: ")
     # Processing the modules based on user request
     if option == "Manual":
@@ -158,8 +185,11 @@ if __name__ == '__main__':
             proxy = next(ra.proxy_swm)
             proxyparse, httpauth = ra.proxy_parse(proxy)
             log('Using the PROXY [ ' + proxyparse + '] for the raffle entries')
-            ra.raffle_entry(url,suburl,proxyparse,httpauth)
+            status=ra.raffle_entry(url,suburl,proxyparse,accounts,httpauth)
+            print(status)
             ra.r.cookies.clear()
+            if status == len(accounts):
+                break;
     elif option == "Online":
         freeproxy = ra.freeproxylist()
         print(freeproxy)
@@ -170,3 +200,4 @@ if __name__ == '__main__':
             ra.r.cookies.clear()
     else:
         log("Please choose either Manual or Online proxy")
+
