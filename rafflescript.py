@@ -124,7 +124,7 @@ class Raffle(object):
     # Initial template of two captcha but not completed fully yet **** IN PROGRESS****
     def twocaptcha(self,sitekey,url):
         sys.path.append(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
-        api_key = os.getenv('APIKEY_2CAPTCHA', '791a83d1333d48429227d52e1a153ea3')
+        api_key = os.getenv('APIKEY_2CAPTCHA', 'xxxxxxxx')
         solver = TwoCaptcha(api_key)
         try:
             result = solver.recaptcha(
